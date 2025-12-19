@@ -93,28 +93,26 @@ sudo -u ubuntu helm install istio-base istio/base --namespace istio-system --cre
 sudo -u ubuntu helm install istiod istio/istiod --namespace istio-system --set meshConfig.enableTracing="true" --set profile=ambient
 
 sudo -u ubuntu cat > /home/ubuntu/istio-podmonitor.yaml << 'EOF'
-apiVersion: v1
-items:
-- apiVersion: monitoring.coreos.com/v1
-  kind: PodMonitor
-  metadata:
-      
-    labels:
-      release: prometheus
-    name: istio-proxies-monitor
-    namespace: prometheus
-    
-  spec:
-    jobLabel: component
-    namespaceSelector:
-      any: true
-    podMetricsEndpoints:
-    - interval: 15s
-      path: /stats/prometheus
-      port: http-envoy-prom
-    selector:
-      matchLabels:
-        security.istio.io/tlsMode: istio
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+
+  labels:
+    release: prometheus
+  name: istio-proxies-monitor
+  namespace: prometheus
+
+spec:
+  jobLabel: component
+  namespaceSelector:
+    any: true
+  podMetricsEndpoints:
+  - interval: 15s
+    path: /stats/prometheus
+    port: http-envoy-prom
+  selector:
+    matchLabels:
+      security.istio.io/tlsMode: istio
 
 EOF
 
