@@ -1,0 +1,122 @@
+# Namespace para a aplicação MOC (Mock Application)
+# Habilitado para injeção automática de sidecar do Istio
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: moc
+  labels:
+    istio-injection: enabled  # Habilita service mesh
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  # O nome da conta de serviço, conforme solicitado.
+  name: moc-user
+  namespace: moc
+ 
+---
+
+# Deployment da aplicação MOC para demonstração de autoscaling
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: moc
+  namespace: moc
+  labels:
+    app: moc
+spec:
+  selector:
+    matchLabels:
+      app: moc
+  template:
+    metadata:
+      labels:
+        app: moc
+    spec:
+      serviceAccountName: moc-user
+      terminationGracePeriodSeconds: 0
+      # Descomentar para o karpenter
+      #topologySpreadConstraints:
+      #- maxSkew: 1
+      #  topologyKey: capacity-spread
+      #  whenUnsatisfiable: DoNotSchedule
+      #  labelSelector:
+      #    matchLabels:
+      #      app: moc
+      
+      # Exemplo de Node Affinity para o karpenter
+      #affinity:
+       # nodeAffinity:
+        #  requiredDuringSchedulingIgnoredDuringExecution:
+         #   nodeSelectorTerms:
+          #  - matchExpressions:
+           #   - key: node.kubernetes.io/instance-type
+            #    operator: In
+             #   values:
+              #  - t3.micro
+              
+      containers:
+      - name: moc
+        image: cquinta/moc-app:beta1  # Imagem da aplicação mock
+        imagePullPolicy: Always
+        env:
+        - name: VERSION
+          value: "v2"  # Versão da aplicação
+        - name: SQS_QUEUE_URL
+          value: "https://sqs.us-east-1.amazonaws.com/707257249187/teste" # Endpoint da Fila do SQS
+        - name: AWS_REGION
+          value: "us-east-1"  # Região AWS
+        resources:
+          requests:  # Recursos mínimos garantidos
+            cpu: 250m     # 1/4 de CPU
+            memory: 128Mi # 128MB de memória
+          limits:    # Limites máximos
+            cpu: 500m     # 1/2 de CPU
+            memory: 256Mi
+        startupProbe:  # Probe de inicialização
+          failureThreshold: 10
+          httpGet:
+            path: /healthcheck
+            port: 8000
+          periodSeconds: 20
+        ports:
+         - containerPort: 8000  # Porta da aplicação
+
+        # Probes comentados para configuração opcional
+        readinessProbe:
+          httpGet:
+            path: /healthcheck
+            port: 8000
+          periodSeconds: 60
+
+        
+       # livenessProbe:
+       #   httpGet:
+       #     path: /healthcheck
+       #     port: 8000
+       #   periodSeconds: 15
+
+
+---
+# Service ClusterIP para acesso interno à aplicação MOC
+apiVersion: v1
+kind: Service
+metadata:
+  name: moc
+  namespace: moc
+  annotations:
+    prometheus.io/port: "metrics"  # Porta para scraping de métricas
+    prometheus.io/scrape: "true"   # Habilita coleta pelo Prometheus
+  labels:
+    app: moc
+spec:
+  selector:
+    app: moc
+  ports:
+  - name: http
+    port: 8000          # Porta do service
+    targetPort: 8000    # Porta do container
+  type: ClusterIP       # Acesso apenas interno
+---

@@ -1,0 +1,5 @@
+commands*
+terraform.tfvars
+.terraform*
+terraform.tfstate
+terraform.*
